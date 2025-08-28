@@ -10,15 +10,15 @@ export default function Chat() {
 
   async function send() {
     if (!input.trim()) return
-    const next = [...messages, { role: 'user', content: input }]
+    const next: Msg[] = [...messages, { role: 'user' as const, content: input }]
     setMessages(next)
     setInput('')
     const payload = next.map(m => ({ role: m.role, content: m.content }))
     try {
       const res = await chat(payload as any)
-      setMessages([...next, { role: 'assistant', content: res.output }])
+      setMessages([...next, { role: 'assistant' as const, content: res.output }])
     } catch (e:any) {
-      setMessages([...next, { role: 'assistant', content: '서버 오류가 발생했습니다. OPENAI_API_KEY가 설정되었는지 확인하세요.' }])
+      setMessages([...next, { role: 'assistant' as const, content: '서버 오류가 발생했습니다. OPENAI_API_KEY가 설정되었는지 확인하세요.' }])
     }
   }
 
