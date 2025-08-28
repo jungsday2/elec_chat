@@ -29,6 +29,24 @@ matplotlib.use("Agg")  # headless
 import matplotlib.pyplot as plt
 import schemdraw
 import schemdraw.elements as elm
+# app/main.py (상단 import 확인)
+from fastapi.middleware.cors import CORSMiddleware
+import os
+
+FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "")  # 반드시 전체 URL, 예: https://jeongirit-frontend.onrender.com
+ALLOWED_ORIGINS = [FRONTEND_ORIGIN] if FRONTEND_ORIGIN else ["*"]  # 비었으면 임시로 전체 허용
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,      # ['https://jeongirit-frontend.onrender.com']
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 디버그용 (배포 로그에서 값 확인)
+print("[CORS] FRONTEND_ORIGIN =", FRONTEND_ORIGIN)
+print("[CORS] ALLOWED_ORIGINS =", ALLOWED_ORIGINS)
 
 load_dotenv()
 
