@@ -22,8 +22,7 @@ services:
     runtime: static
     rootDir: frontend
     buildCommand: npm install && npm run build
-    staticPublishPath: ./dist
-    plan: free                    # Static Site도 Free
+    staticPublishPath: ./dist                   
     envVars:
       - key: VITE_API_BASE
         value: https://chatbot-elec.onrender.com   # 백엔드 공개 URL을 빌드타임에 주입
