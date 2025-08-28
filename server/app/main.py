@@ -30,7 +30,8 @@ import matplotlib.pyplot as plt
 import schemdraw
 import schemdraw.elements as elm
 # app/main.py (상단 import 확인)
-app = FastAPI()
+app = FastAPI(title="JeongirIt Backend", version="1.0.0")
+
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "")  # 반드시 전체 URL, 예: https://jeongirit-frontend.onrender.com
 ALLOWED_ORIGINS = [FRONTEND_ORIGIN] if FRONTEND_ORIGIN else ["*"]  # 비었으면 임시로 전체 허용
 
@@ -54,18 +55,6 @@ DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 if not OPENAI_API_KEY:
     # Don't crash, but warn clearly in logs.
     print("[WARN] OPENAI_API_KEY is not set. LLM features will fail until it's configured.")
-
-app = FastAPI(title="JeongirIt Backend", version="1.0.0")
-
-# CORS
-FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "*")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[FRONTEND_ORIGIN] if FRONTEND_ORIGIN != "*" else ["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # ---------- Models ----------
 class ChatMessage(BaseModel):
