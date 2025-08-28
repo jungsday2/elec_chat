@@ -1,23 +1,29 @@
-
-# render.yaml — deploy both frontend (static) and backend (FastAPI) on Render
+# render.yaml — Minimal & Stable (Free plan)
 services:
+  # 1) 백엔드: FastAPI
   - type: web
-    name: jeongirit-backend
+    name: chatbot-elec            # 기존 백엔드 주소 유지하려면 이 이름을 그대로 쓰세요
     runtime: python
     rootDir: server
-    plan: free
-    region: singapore
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    plan: free                    # Starter(유료) 선택 방지
     envVars:
       - key: OPENAI_MODEL
         value: gpt-4o-mini
       - key: OPENAI_API_KEY
-        sync: false  # will prompt you to set this in the dashboard
+        sync: false               # 대시보드에서 값 입력(필수)
+      # - key: FRONTEND_ORIGIN    # CORS를 제한하려면 여기에 프론트 URL을 value로 직접 넣으세요
+      #   value: https://<your-frontend>.onrender.com
 
+  # 2) 프론트엔드: Vite Static Site
   - type: web
     name: jeongirit-frontend
     runtime: static
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
+    plan: free                    # Static Site도 Free
+    envVars:
+      - key: VITE_API_BASE
+        value: https://chatbot-elec.onrender.com   # 백엔드 공개 URL을 빌드타임에 주입
