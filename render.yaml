@@ -14,11 +14,6 @@ services:
         value: gpt-4o-mini
       - key: OPENAI_API_KEY
         sync: false  # will prompt you to set this in the dashboard
-      - key: FRONTEND_ORIGIN
-        fromService:
-          type: web
-          name: jeongirit-frontend
-          property: url
 
   - type: web
     name: jeongirit-frontend
