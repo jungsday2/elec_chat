@@ -13,8 +13,8 @@ services:
         value: gpt-4o-mini
       - key: OPENAI_API_KEY
         sync: false               # 대시보드에서 값 입력(필수)
-      # - key: FRONTEND_ORIGIN    # CORS를 제한하려면 여기에 프론트 URL을 value로 직접 넣으세요
-      #   value: https://<your-frontend>.onrender.com
+      - key: FRONTEND_ORIGIN      # CORS를 제한하기 위해 프론트엔드 URL을 명시합니다.
+        value: https://jeongirit-frontend.onrender.com
 
   # 2) 프론트엔드: Vite Static Site
   - type: web
