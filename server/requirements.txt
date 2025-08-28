@@ -1,0 +1,14 @@
+
+fastapi==0.112.2
+uvicorn==0.30.6
+python-dotenv==1.0.1
+pydantic>=2.7.0
+langchain>=0.2.14
+langchain-openai>=0.1.22
+langchain-community>=0.2.12
+tiktoken>=0.7.0
+faiss-cpu>=1.8.0
+pypdf>=4.3.1
+sympy>=1.12
+schemdraw>=0.19
+matplotlib>=3.8.4
