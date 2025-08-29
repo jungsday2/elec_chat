@@ -9,7 +9,7 @@ export default function DocumentQA() {
   const [file, setFile] = useState<File | null>(null)
   const [messages, setMessages] = useState<Msg[]>([])
   const [question, setQuestion] = useState('')
-  const [status, setStatus] = useState('파일을 업로드하고 질문을 시작하세요.')
+  const [status, setStatus] = useState('PDF 파일을 업로드하고 질문을 시작하세요.')
   const [isLoading, setIsLoading] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
