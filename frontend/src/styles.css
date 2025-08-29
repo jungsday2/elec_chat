@@ -1,32 +1,89 @@
+/* --- 1. 기본 스타일 --- */
+body {
+  margin: 0;
+  font-family: 'Inter', 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f9fafb; /* 이미지와 유사한 배경색 */
+  color: #374151;
+  line-height: 1.6;
+}
 
-* { box-sizing: border-box; }
-body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#0b1220; color: #e5e7eb; }
-.container { max-width: 980px; margin: 0 auto; padding: 20px; }
-.header { text-align: center; margin-bottom: 16px; }
-.header h1 { margin: 0; font-size: 28px; }
-.header p { margin: 4px 0 0; color: #9ca3af; }
-.tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0 24px;}
-.tabs button { background:#111827; border:1px solid #1f2937; color:#e5e7eb; border-radius: 10px; padding: 10px 12px; cursor: pointer; }
-.tabs .active { background: #1f2937; border-color:#374151; }
-.main { background:#0f172a; border: 1px solid #374151; border-radius: 12px; padding: 16px; min-height: 540px; }
-.footer { text-align:center; color:#9ca3af; margin-top: 16px; }
+/* --- 2. 상단 네비게이션 레이아웃 --- */
+.app-container {
+  max-width: 1024px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
 
+.app-header {
+  text-align: center;
+  padding: 48px 0;
+}
+
+.app-header h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #111827;
+  margin: 0;
+}
+
+.app-header p {
+  font-size: 1rem;
+  color: #6b7280;
+  margin-top: 8px;
+}
+
+.app-nav {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.app-nav button {
+  padding: 12px 16px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: none;
+  background-color: transparent;
+  cursor: pointer;
+  color: #6b7280;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease-out;
+}
+
+.app-nav button:hover {
+  color: #3b82f6;
+}
+
+.app-nav button.active {
+  color: #3b82f6;
+  border-bottom-color: #3b82f6;
+}
+
+.main-content {
+  padding: 16px;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  min-height: 60vh;
+}
+
+/* --- 3. 기존 컴포넌트 스타일 호환 --- */
 .panel { display:flex; flex-direction: column; gap: 12px; }
 .row { display:flex; gap:12px; flex-wrap: wrap; }
-input[type="text"], input[type="number"], textarea, select {
+input[type="text"], input[type="number"], input[type="file"], textarea, select {
   flex: 1; min-width: 180px;
-  background:#111827; color:#e5e7eb; border:1px solid #374151; border-radius: 8px; padding: 8px 10px;
+  background:#ffffff; color:#111827; border:1px solid #d1d5db; border-radius: 8px; padding: 8px 10px;
 }
-button.primary { background:#2563eb; border: none; padding: 10px 14px; border-radius: 10px; color:white; cursor:pointer; }
-button.ghost { background:#111827; border: 1px solid #374151; padding: 10px 14px; border-radius: 10px; color:#e5e7eb; cursor:pointer; }
-.messages { display:flex; flex-direction: column; gap:8px; max-height: 420px; overflow:auto; padding-right:6px;}
-.msg { padding: 10px; border-radius: 8px; border:1px solid #374151; }
-.msg.user { background:#111827; }
-.msg.assistant { background:#0b2a1c; border-color:#335f49; }
-.small { color:#9ca3af; font-size: 12px; }
-
-.grid2 { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.card { padding: 12px; border:1px solid #374151; border-radius:12px; background:#111827; }
+button.primary { background:#3b82f6; border: none; padding: 10px 14px; border-radius: 10px; color:white; cursor:pointer; }
+.card { padding: 12px; border:1px solid #e5e7eb; border-radius:12px; background:#f9fafb; }
 table { width:100%; border-collapse: collapse; }
-th, td { border:1px solid #374151; padding: 6px 8px; text-align:left; }
-th { background:#0f172a; }
+th, td { border:1px solid #e5e7eb; padding: 6px 8px; text-align:left; }
+th { background:#f3f4f6; }
+.grid2 { display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.small { color:#6b7280; font-size: 12px; }
