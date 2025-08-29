@@ -1,0 +1,44 @@
+/* frontend/src/components/UnitsAndSymbols.css */
+.units-container {
+  padding: 16px;
+}
+
+.units-container h3 {
+  margin-top: 0;
+  margin-bottom: 24px;
+  font-size: 1.5rem;
+}
+
+.table-wrapper {
+  overflow-x: auto; /* 화면이 좁을 때 가로 스크롤 생성 */
+}
+
+.units-container table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+  border: 1px solid #e5e7eb;
+}
+
+.units-container th,
+.units-container td {
+  border: 1px solid #e5e7eb;
+  padding: 12px 16px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.units-container thead th {
+  background-color: #f9fafb;
+  font-weight: 600;
+}
+
+.units-container tbody .category {
+  background-color: #f3f4f6;
+  font-weight: 600;
+  text-align: center;
+}
+
+.units-container tbody tr:hover {
+  background-color: #f9fafb;
+}
