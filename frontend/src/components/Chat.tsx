@@ -1,9 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { chat } from '../api'
+import ReactMarkdown from 'react-markdown'
 import './Chat.css';
 
-type Msg = { role: 'user' | 'assistant', content: string }
+// 메시지 타입을 명확하게 정의
+type Msg = { 
+  role: 'user' | 'assistant', 
+  content: string 
+}
 
+// 초기 추천 질문 목록
 const INITIAL_SUGGESTIONS = [
     'ESS 산업 현황에 대해 알려줘',
     'BESS 시장 트렌드 핵심 포인트',
@@ -15,75 +21,107 @@ export default function Chat() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>(INITIAL_SUGGESTIONS);
+
   const chatWindowRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // 컴포넌트가 처음 마운트될 때 로컬 스토리지에서 대화 기록을 불러옴
   useEffect(() => {
-    const savedChat = localStorage.getItem('chatHistory');
-    if (savedChat) {
-      setMessages(JSON.parse(savedChat));
-    } else {
-      setMessages([
-        { role: 'assistant', content: '안녕하세요! 어떻게 도와드릴까요? 전기·공학에 관한 질문이나 다른 주제에 대해 이야기하고 싶으신가요?' }
-      ]);
+    try {
+      const savedChat = localStorage.getItem('chatHistory');
+      if (savedChat) {
+        setMessages(JSON.parse(savedChat));
+      } else {
+        // 저장된 기록이 없으면 초기 메시지 설정
+        setMessages([
+          { role: 'assistant', content: '안녕하세요! 어떻게 도와드릴까요? 전기·공학에 관한 질문이나 다른 주제에 대해 이야기하고 싶으신가요?' }
+        ]);
+      }
+    } catch (error) {
+      console.error("Failed to parse chat history from localStorage", error);
+      // 파싱 오류 발생 시 초기 상태로 리셋
+      localStorage.removeItem('chatHistory');
     }
   }, []);
 
+  // 메시지 목록이 변경될 때마다 자동으로 로컬 스토리지에 저장
   useEffect(() => {
+    // 메시지가 있을 때만 저장하여 불필요한 저장을 방지
     if (messages.length > 0) {
       localStorage.setItem('chatHistory', JSON.stringify(messages));
     }
   }, [messages]);
 
+  // 새 메시지가 추가되면 채팅창을 맨 아래로 스크롤
   useEffect(() => {
     if (chatWindowRef.current) {
       chatWindowRef.current.scrollTop = chatWindowRef.current.scrollHeight;
     }
   }, [messages]);
   
+  // 입력 텍스트 길이에 따라 textarea 높이 자동 조절
   useEffect(() => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+      textareaRef.current.style.height = 'auto'; // 높이를 초기화
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`; // 스크롤 높이에 맞게 설정
     }
   }, [input]);
 
-  async function send(messageContent: string) {
+  // 메시지 전송 함수
+  const send = async (messageContent: string) => {
     if (!messageContent.trim() || isLoading) return;
     
-    const next: Msg[] = [...messages, { role: 'user' as const, content: messageContent }];
-    setMessages(next);
+    // [개선 1] 상태 업데이트의 비동기적 특성을 고려하여, API에 보낼 payload를 현재 messages가 아닌
+    // 업데이트될 next 배열을 기준으로 생성
+    const userMessage: Msg = { role: 'user' as const, content: messageContent };
+    const nextMessages: Msg[] = [...messages, userMessage];
+    
+    setMessages(nextMessages); // 화면에 사용자 메시지 즉시 표시
     setInput('');
     setIsLoading(true);
 
-    const payload = next.map(m => ({ role: m.role, content: m.content }));
+    // API에 보낼 메시지 페이로드
+    const payload = nextMessages.map(m => ({ role: m.role, content: m.content }));
+
     try {
       const res = await chat(payload as any);
-      setMessages([...next, { role: 'assistant' as const, content: res.output }]);
-      // 추천 질문이 있을 경우에만 업데이트
-      if(res.suggestions && res.suggestions.length > 0) {
+      const assistantMessage: Msg = { role: 'assistant' as const, content: res.output };
+      
+      // [개선 2] 서버 응답을 받을 때, 현재 시점의 messages에 추가하는 함수형 업데이트 사용
+      // 이는 여러 번의 상태 업데이트 요청이 있을 때 충돌을 방지함
+      setMessages(prevMessages => [...prevMessages, assistantMessage]);
+
+      if (res.suggestions && res.suggestions.length > 0) {
         setSuggestions(res.suggestions);
       }
     } catch (e: any) {
-      setMessages([...next, { role: 'assistant' as const, content: '서버 오류가 발생했습니다. OPENAI_API_KEY가 설정되었는지 확인하세요.' }]);
+      const errorMessage: Msg = { role: 'assistant' as const, content: '서버 오류가 발생했습니다. OPENAI_API_KEY가 설정되었는지 확인하세요.' };
+      setMessages(prevMessages => [...prevMessages, errorMessage]);
     } finally {
       setIsLoading(false);
     }
   }
 
+  // 전송 버튼 클릭 핸들러
   const handleSendClick = () => {
     send(input);
   }
 
+  // 추천 질문 클릭 핸들러
   const handleSuggestionClick = (suggestion: string) => {
-    // 추천 질문을 바로 전송
-    send(suggestion);
+    // [개선 3] 추천 질문 클릭 시, 입력창에 텍스트를 잠시 보여주는 대신 바로 전송하여
+    // 사용자 경험(UX)을 더 직관적으로 만듦
+    if (!isLoading) {
+      send(suggestion);
+    }
   };
 
+  // 클립보드에 텍스트 복사
   const handleCopyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
+    navigator.clipboard.writeText(text).catch(err => console.error('Failed to copy text: ', err));
   };
 
+  // 새로운 대화 시작
   const startNewChat = () => {
     localStorage.removeItem('chatHistory');
     setMessages([
@@ -101,7 +139,7 @@ export default function Chat() {
           <div key={index} className={`message-wrapper ${msg.role}`}>
             {msg.role === 'assistant' && <div className="avatar">🤖</div>}
             <div className="message-content">
-              <p>{msg.content}</p>
+              <ReactMarkdown>{msg.content}</ReactMarkdown>
               <button className="copy-btn" onClick={() => handleCopyToClipboard(msg.content)}>
                 📋
               </button>
@@ -139,10 +177,10 @@ export default function Chat() {
             <div className="example-queries">
               <span>추천 질문</span>
               {suggestions.map((q, i) => (
-                <button key={i} onClick={() => handleSuggestionClick(q)}>{q}</button>
+                <button key={i} onClick={() => handleSuggestionClick(q)} disabled={isLoading}>{q}</button>
               ))}
             </div>
-            <button className="new-chat-btn" onClick={startNewChat}>새로운 대화 시작</button>
+            <button className="new-chat-btn" onClick={startNewChat} disabled={isLoading}>새로운 대화 시작</button>
         </div>
       </div>
     </div>
