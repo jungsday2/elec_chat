@@ -3,9 +3,10 @@ import axios from 'axios'
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
 
+// ▼▼▼ [수정] chat 함수의 반환 타입 변경 ▼▼▼
 export async function chat(messages: {role:'system'|'user'|'assistant'; content:string}[]) {
   const res = await axios.post(`${API_BASE}/api/chat`, { messages })
-  return res.data as { output: string }
+  return res.data as { output: string, suggestions: string[] }
 }
 
 export async function documentQA(file: File, question: string) {
