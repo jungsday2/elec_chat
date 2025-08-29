@@ -153,7 +153,7 @@ export default function DocumentQA() {
             onKeyPress={e => e.key === 'Enter' && handleAskQuestion()}
             disabled={isLoading}
           />
-          <button onClick={handleAskQuestion} disabled={isLoading}>질문하기</button>
+          <button onClick={handleAskQuestion} disabled={isLoading}>전송</button>
         </div>
       </div>
     </div>
