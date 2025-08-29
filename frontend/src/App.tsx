@@ -2,10 +2,10 @@ import React, { useState } from 'react'
 import Chat from './components/Chat'
 import DocumentQA from './components/DocumentQA'
 import Calculators from './components/Calculators'
-// import CircuitProblem from './components/CircuitProblem' // --- 제거
+import UnitsAndSymbols from './components/UnitsAndSymbols' // --- [추가] 새로운 컴포넌트 임포트
 import './styles.css'
 
-type Tab = 'chat' | 'rag' | 'calc' | 'units' // --- 'circuit' 제거
+type Tab = 'chat' | 'rag' | 'calc' | 'units'
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('chat')
@@ -13,7 +13,7 @@ export default function App() {
   return (
     <div className="app-container">
       <header className="app-header">
-        <h1>⚡️ 전기·전자 종합 어시턴트</h1>
+        <h1>⚡️ 전기·전자 종합 어시스턴트</h1>
         <p>요약, 계산, 대화, 문서 분석까지 하나의 툴에서 해결하세요.</p>
       </header>
 
@@ -28,7 +28,7 @@ export default function App() {
         {tab === 'chat' && <Chat />}
         {tab === 'rag' && <DocumentQA />}
         {tab === 'calc' && <Calculators />}
-        {tab === 'units' && <div>단위 및 기호 컨텐츠</div>}
+        {tab === 'units' && <UnitsAndSymbols />} {/* --- [수정] UnitsAndSymbols 컴포넌트 렌더링 */}
       </main>
     </div>
   )
