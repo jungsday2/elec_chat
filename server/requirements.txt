@@ -19,8 +19,6 @@ tiktoken>=0.7.0
 faiss-cpu>=1.8.0
 pypdf>=4.3.1
 sympy>=1.12
-schemdraw>=0.19
-matplotlib>=3.8.4
 
 # 유틸
 python-dotenv>=1.0.1            # (옵션) .env 로컬 개발 시
