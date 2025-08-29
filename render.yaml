@@ -12,7 +12,7 @@ services:
       - key: OPENAI_MODEL
         value: gpt-4o-mini
       - key: OPENAI_API_KEY
-        sync: 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           # 대시보드에서 값 입력(필수)
+        sync: false           # 대시보드에서 값 입력(필수)
       - key: FRONTEND_ORIGIN      # CORS를 제한하기 위해 프론트엔드 URL을 명시합니다.
         value: https://jeongirit-frontend.onrender.com
 
