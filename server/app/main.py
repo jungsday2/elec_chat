@@ -20,15 +20,10 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langchain_core.documents import Document
 
-# Calculations and circuit drawing
 import math
 import cmath
 import sympy as sp
-import matplotlib
-matplotlib.use("Agg")  # headless
-import matplotlib.pyplot as plt
-import schemdraw
-import schemdraw.elements as elm
+
 
 app = FastAPI(title="JeongirIt Backend", version="1.0.0")
 
@@ -166,7 +161,6 @@ async def document_qa(file: UploadFile = File(...), question: str = Form(...)):
             
     return {"answer": answer, "sources": sources}
 
-# (이하 계산기 및 회로 문제 생성 코드는 기존과 동일)
 class OhmsLawRequest(BaseModel):
     V: Optional[float] = None
     I: Optional[float] = None
@@ -236,19 +230,3 @@ def resistor_color(req: ResistorCodeRequest):
     d1, d2 = digits // 10, digits % 10
     multiplier_color = bands[exponent][0] if 0 <= exponent < len(bands) else "gold"
     return {"bands": [color_for_digit(d1), color_for_digit(d2), multiplier_color, "gold"]}
-
-@app.get("/api/circuit-problem")
-def circuit_problem():
-    V0 = random.randint(int(os.getenv("CIRCUIT_V_MIN", "5")), int(os.getenv("CIRCUIT_V_MAX", "24")))
-    R1 = random.randint(int(os.getenv("CIRCUIT_R_MIN", "10")), int(os.getenv("CIRCUIT_R_MAX", "500")))
-    R2 = random.randint(int(os.getenv("CIRCUIT_R_MIN", "10")), int(os.getenv("CIRCUIT_R_MAX", "500")))
-    Rt, I, V1, V2 = R1 + R2, V0 / (R1 + R2), (V0 * R1) / (R1 + R2), (V0 * R2) / (R1 + R2)
-    with schemdraw.Drawing(show=False) as d:
-        d.config(fontsize=12)
-        d += elm.SourceV().up().label(f"{V0} V", loc="right")
-        d += elm.Line().right(); d += elm.Resistor().down().label(f"R1 = {R1} Ω"); d += elm.Line().left()
-        d += elm.Resistor().up().label(f"R2 = {R2} Ω"); d += elm.Line().right()
-    img = io.BytesIO(); d.save(img, fmt="png"); img.seek(0)
-    b64 = base64.b64encode(img.getvalue()).decode("utf-8")
-    q = random.choice(["...총 저항 Rt는?", "...총 전류 I는?", "...저항 R1의 전압강하 V1은?", "...저항 R2의 전압강하 V2는?"])
-    return {"image_base64": b64, "V": V0, "R1": R1, "R2": R2, "question": f"회로의 {q}", "solution": {"Rt": Rt, "I": I, "V1": V1, "V2": V2}}
