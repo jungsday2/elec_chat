@@ -6,7 +6,7 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f9fafb; /* 이미지와 유사한 배경색 */
+  background-color: #f9fafb;
   color: #374151;
   line-height: 1.6;
 }
@@ -73,17 +73,74 @@ body {
   min-height: 60vh;
 }
 
-/* --- 3. 기존 컴포넌트 스타일 호환 --- */
-.panel { display:flex; flex-direction: column; gap: 12px; }
+/* --- 3. 컴포넌트 스타일 --- */
+.panel { display:flex; flex-direction: column; gap: 16px; }
 .row { display:flex; gap:12px; flex-wrap: wrap; }
-input[type="text"], input[type="number"], input[type="file"], textarea, select {
-  flex: 1; min-width: 180px;
-  background:#ffffff; color:#111827; border:1px solid #d1d5db; border-radius: 8px; padding: 8px 10px;
+
+input[type="text"], input[type="number"], select {
+  width: 100%;
+  box-sizing: border-box;
+  background:#ffffff; 
+  color:#111827; 
+  border:1px solid #d1d5db; 
+  border-radius: 8px; 
+  padding: 10px 12px;
+  font-size: 0.9rem;
 }
-button.primary { background:#3b82f6; border: none; padding: 10px 14px; border-radius: 10px; color:white; cursor:pointer; }
-.card { padding: 12px; border:1px solid #e5e7eb; border-radius:12px; background:#f9fafb; }
-table { width:100%; border-collapse: collapse; }
-th, td { border:1px solid #e5e7eb; padding: 6px 8px; text-align:left; }
-th { background:#f3f4f6; }
-.grid2 { display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
-.small { color:#6b7280; font-size: 12px; }
+
+/* [추가] textarea 스타일 정의 */
+textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background:#ffffff; 
+  color:#111827; 
+  border:1px solid #d1d5db; 
+  border-radius: 8px; 
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  margin: 12px 0 0;
+}
+
+button {
+  padding: 10px 14px; 
+  border-radius: 8px; 
+  border: 1px solid #d1d5db;
+  background-color: #ffffff;
+  color:#374151; 
+  cursor:pointer;
+  font-weight: 600;
+}
+
+button.primary { 
+  background:#3b82f6; 
+  border-color: #3b82f6;
+  color:white; 
+}
+
+.card { 
+  padding: 16px; 
+  border:1px solid #e5e7eb; 
+  border-radius:12px; 
+  background:#f9fafb; 
+  display: flex;
+  flex-direction: column;
+}
+
+/* [수정] 카드 제목 스타일 */
+.card h3 {
+  margin: 0 0 16px 0;
+  font-size: 1.1rem;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 12px;
+}
+
+table { width:100%; border-collapse: collapse; font-size: 0.9rem; }
+th, td { border:1px solid #e5e7eb; padding: 8px 10px; text-align:left; }
+th { background:#f3f4f6; font-weight: 600; }
+
+.grid2 { display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+/* [추가] 3열 그리드 스타일 */
+.grid3 { display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+
+.small { color:#4b5563; font-size: 0.85rem; }
