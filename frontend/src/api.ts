@@ -1,9 +1,7 @@
-
 import axios from 'axios'
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
 
-// ▼▼▼ [수정] chat 함수의 반환 타입 변경 ▼▼▼
 export async function chat(messages: {role:'system'|'user'|'assistant'; content:string}[]) {
   const res = await axios.post(`${API_BASE}/api/chat`, { messages })
   return res.data as { output: string, suggestions: string[] }
@@ -44,7 +42,4 @@ export async function rlc(payload: {R:number;L:number;C:number;f:number}) {
   return res.data as {Xl:number;Xc:number;Z_mag:number;Z_phase_deg:number}
 }
 
-export async function circuitProblem() {
-  const res = await axios.get(`${API_BASE}/api/circuit-problem`)
-  return res.data as { image_base64: string, V:number, R1:number, R2:number, question:string, solution: Record<string, number> }
-}
+// --- [제거] circuitProblem 함수 전체 제거 ---
