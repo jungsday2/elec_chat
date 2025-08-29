@@ -1,9 +1,8 @@
-
 # app/main.py
 import os
 import io
 import base64
-import json # JSON 파싱을 위해 추가
+import json
 from typing import List, Optional, Literal
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -52,7 +51,6 @@ DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 if not OPENAI_API_KEY:
     print("[WARN] OPENAI_API_KEY is not set. LLM features will fail until it's configured.")
 
-# ---------- Models ----------
 class ChatMessage(BaseModel):
     role: Literal["system", "user", "assistant"]
     content: str
@@ -62,16 +60,14 @@ class ChatRequest(BaseModel):
     temperature: float = 0.3
     system_style: Optional[str] = None
 
-# ▼▼▼ [수정] ChatResponse 모델에 suggestions 필드 추가 ▼▼▼
 class ChatResponse(BaseModel):
     output: str
     suggestions: List[str]
 
-# ---------- Utilities ----------
 STYLE_SYS = (
     "한국어 존댓말을 사용합니다. 말투는 친절하고 전문적으로 유지합니다. "
     "핵심은 간결하게 전달하되, 전력·에너지·모빌리티 분야의 수치/단위/기호(η, THD, pf, pu, kW, kWh, °C 등)는 보존합니다. "
-    "불확실하거나 기억이 모호한 내용은 '불확실'로 표시하고 추정·일반론은 명확히 구분합니다. 과장 표현은 지양합니다."
+    "불확실하거나 기억이 모호한 내용은 '불확실'으로 표시하고 추정·일반론은 명확히 구분합니다. 과장 표현은 지양합니다."
 )
 
 def _ensure_system_style(messages: List[ChatMessage], override: Optional[str] = None) -> List[ChatMessage]:
@@ -81,96 +77,96 @@ def _ensure_system_style(messages: List[ChatMessage], override: Optional[str] = 
         msgs = [sys_msg] + msgs
     return msgs
 
-# ---------- Routes ----------
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
 
-# ▼▼▼ [수정] /api/chat 엔드포인트 로직 수정 ▼▼▼
 @app.post("/api/chat", response_model=ChatResponse)
 def chat(req: ChatRequest):
-    lc_messages = []
-    for m in _ensure_system_style(req.messages, req.system_style):
-        lc_messages.append({"role": m.role, "content": m.content})
-    
+    lc_messages = [{"role": m.role, "content": m.content} for m in _ensure_system_style(req.messages, req.system_style)]
     trimmed_history = lc_messages[-20:]
     llm = ChatOpenAI(model=DEFAULT_MODEL, temperature=req.temperature)
     
-    # 1. 메인 답변 생성
     resp = llm.invoke(trimmed_history)
     main_answer = resp.content if hasattr(resp, "content") else str(resp)
 
-    # 2. 후속 질문 추천 생성
     suggestions = []
     try:
         suggestion_prompt = ChatPromptTemplate.from_messages([
-            ("system", "지금까지의 대화 내용을 바탕으로, 사용자가 궁금해할 만한 다음 질문 3개를 추천해주세요. "
-                       "질문은 매우 짧고 간결해야 합니다. "
-                       "반드시 JSON 형식의 문자열 배열로만 응답해야 합니다. 예: [\"질문 1\", \"질문 2\", \"질문 3\"]"),
-            # HumanMessage 대신 전체 대화 기록을 전달
+            ("system", "지금까지의 대화 내용을 바탕으로, 사용자가 궁금해할 만한 다음 질문 3개를 추천해주세요. 질문은 매우 짧고 간결해야 합니다. 반드시 JSON 형식의 문자열 배열로만 응답해야 합니다. 예: [\"질문 1\", \"질문 2\", \"질문 3\"]"),
             ("human", f"대화 기록: {json.dumps(trimmed_history, ensure_ascii=False)}")
         ])
         suggestion_chain = suggestion_prompt | ChatOpenAI(model=DEFAULT_MODEL, temperature=0.5)
         suggestion_resp = suggestion_chain.invoke({})
-        # 응답 content가 JSON 문자열이므로 파싱
         suggestions = json.loads(suggestion_resp.content)
     except Exception as e:
         print(f"[WARN] Failed to generate suggestions: {e}")
-        # 실패 시 빈 리스트 반환
         suggestions = []
 
     return ChatResponse(output=main_answer, suggestions=suggestions)
 
-# ---------- Document QA (RAG) ----------
-def _build_retriever_from_pdf_bytes(pdf_bytes: bytes):
+def _build_retriever_from_pdf_bytes(pdf_bytes: bytes, k: int = 4):
     tmp_path = "/tmp/upload.pdf"
-    with open(tmp_path, "wb") as f:
-        f.write(pdf_bytes)
+    with open(tmp_path, "wb") as f: f.write(pdf_bytes)
     loader = PyPDFLoader(tmp_path)
     docs = loader.load()
-
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1200, chunk_overlap=200, separators=["\n\n", "\n", ". ", " ", ""]
-    )
+    splitter = RecursiveCharacterTextSplitter(chunk_size=1200, chunk_overlap=200, separators=["\n\n", "\n", ". ", " ", ""])
     chunks = splitter.split_documents(docs)
     embeddings = OpenAIEmbeddings()
     vs = FAISS.from_documents(chunks, embeddings)
-    retriever = vs.as_retriever(search_kwargs={"k": 4})
-    return retriever
+    return vs.as_retriever(search_kwargs={"k": k})
 
+# ▼▼▼ [수정] /api/document-qa 엔드포인트 로직 수정 ▼▼▼
 @app.post("/api/document-qa")
-async def document_qa(
-    file: UploadFile = File(...),
-    question: str = Form(...)
-):
+async def document_qa(file: UploadFile = File(...), question: str = Form(...)):
     pdf_bytes = await file.read()
-    retriever = _build_retriever_from_pdf_bytes(pdf_bytes)
+    
+    # 1. 질문 유형에 따라 k값과 프롬프트 동적 변경
+    is_summary_request = any(keyword in question for keyword in ["요약", "정리", "알려줘", "설명해", "summarize", "explain"])
+    
+    if is_summary_request:
+        k_value = 10
+        prompt_template = (
+            "당신은 문서를 요약하는 전문가입니다. 주어진 여러 문서 조각들을 종합하여, 전체 문서의 핵심 내용을 상세하고 구조적으로 요약하세요. "
+            "서론, 본론, 결론의 흐름이 드러나도록 정리하고, 중요한 수치나 데이터는 반드시 포함하세요. 모든 답변은 한국어로 작성해야 합니다."
+            "\n\n[문서 조각들]\n{context}"
+        )
+    else:
+        k_value = 4
+        prompt_template = (
+            "주어진 문서 조각들만 근거로, 사용자의 질문에 한국어로 정확하고 간결하게 답하세요. "
+            "출처가 불명확하면 '문서에서 확인되지 않습니다'라고 답하세요. "
+            "중요 숫자·기호·단위를 보존하세요."
+            "\n\n[문서 조각들]\n{context}"
+        )
+
+    # 2. 동적으로 결정된 k값으로 리트리버 생성
+    retriever = _build_retriever_from_pdf_bytes(pdf_bytes, k=k_value)
 
     system_prompt = ChatPromptTemplate.from_messages([
-        ("system", "주어진 문서 조각들만 근거로, 한국어로 정확하고 간결하게 답하세요. "
-                   "출처가 불명확하면 '문서에서 확인되지 않습니다'라고 답하세요. "
-                   "중요 숫자·기호·단위를 보존하세요."),
+        ("system", prompt_template),
         ("human", "{input}")
     ])
+    
     qa_chain = create_stuff_documents_chain(
-        llm=ChatOpenAI(model=DEFAULT_MODEL, temperature=0),
+        llm=ChatOpenAI(model=DEFAULT_MODEL, temperature=0.1), # 요약을 위해 약간의 창의성 허용
         prompt=system_prompt
     )
     chain = create_retrieval_chain(retriever, qa_chain)
 
     result = chain.invoke({"input": question})
-    answer = result.get("answer") or result.get("output_text") or ""
+    answer = result.get("answer") or ""
     contexts = result.get("context", [])
     sources = []
     for d in contexts:
-        if isinstance(d, Document):
-            meta = d.metadata or {}
-            page = meta.get("page", None)
-            src = {"page": int(page) + 1 if page is not None else None, "source": meta.get("source", "")}
+        if isinstance(d, Document) and d.metadata:
+            page = d.metadata.get("page", None)
+            src = {"page": int(page) + 1 if page is not None else None, "source": d.metadata.get("source", "")}
             sources.append(src)
+            
     return {"answer": answer, "sources": sources}
 
-# ---------- Calculators ----------
+# (이하 계산기 및 회로 문제 생성 코드는 기존과 동일)
 class OhmsLawRequest(BaseModel):
     V: Optional[float] = None
     I: Optional[float] = None
@@ -188,35 +184,15 @@ def ohms_law(req: OhmsLawRequest):
         if R is not None: equations.append(sp.Eq(r, R))
         if P is not None: equations.append(sp.Eq(p, P))
         equations += [sp.Eq(v, i*r), sp.Eq(p, v*i)]
-        sol = sp.nsolve(
-            [eq.lhs - eq.rhs for eq in equations],
-            (v, i, r, p),
-            (V or 1.0, I or 1.0, R or 1.0, P or 1.0),
-            tol=1e-11, maxsteps=100
-        )
+        sol = sp.nsolve([eq.lhs - eq.rhs for eq in equations], (v, i, r, p), (V or 1.0, I or 1.0, R or 1.0, P or 1.0))
         Vc, Ic, Rc, Pc = [float(s) for s in sol]
         return {"V": Vc, "I": Ic, "R": Rc, "P": Pc}
     except Exception:
-        if V is not None and I is not None:
-            R = V / I
-            P = V * I
-            return {"V": V, "I": I, "R": R, "P": P}
-        if V is not None and R is not None:
-            I = V / R
-            P = V * I
-            return {"V": V, "I": I, "R": R, "P": P}
-        if I is not None and R is not None:
-            V = I * R
-            P = V * I
-            return {"V": V, "I": I, "R": R, "P": P}
-        if P is not None and V is not None:
-            I = P / V
-            R = V / I
-            return {"V": V, "I": I, "R": R, "P": P}
-        if P is not None and I is not None:
-            V = P / I
-            R = V / I
-            return {"V": V, "I": I, "R": R, "P": P}
+        if V is not None and I is not None: return {"V": V, "I": I, "R": V / I, "P": V * I}
+        if V is not None and R is not None: I = V/R; return {"V": V, "I": I, "R": R, "P": V * I}
+        if I is not None and R is not None: V = I*R; return {"V": V, "I": I, "R": R, "P": V * I}
+        if P is not None and V is not None: I = P/V; return {"V": V, "I": I, "R": V / I, "P": P}
+        if P is not None and I is not None: V = P/I; return {"V": V, "I": I, "R": V / I, "P": P}
         return {"error": "최소 두 개 이상의 값이 필요합니다 (예: V와 I)."}
 
 class Resistances(BaseModel):
@@ -228,18 +204,12 @@ def series_resistance(req: Resistances):
 
 @app.post("/api/resistance/parallel")
 def parallel_resistance(req: Resistances):
-    if not req.values:
-        return {"R_total": 0.0}
-    if any(v == 0 for v in req.values):
-        return {"R_total": 0.0}
+    if not req.values or any(v == 0 for v in req.values): return {"R_total": 0.0}
     inv = sum(1.0/v for v in req.values)
     return {"R_total": float("inf") if inv == 0 else 1.0/inv}
 
 class RLCRequest(BaseModel):
-    R: float
-    L: float
-    C: float
-    f: float
+    R: float; L: float; C: float; f: float
 
 @app.post("/api/rlc")
 def rlc(req: RLCRequest):
@@ -247,9 +217,7 @@ def rlc(req: RLCRequest):
     Xl = w*req.L
     Xc = 1/(w*req.C) if req.C != 0 else float("inf")
     Z = complex(req.R, Xl - Xc)
-    mag = abs(Z)
-    phase = math.degrees(cmath.phase(Z))
-    return {"Xl": Xl, "Xc": Xc, "Z_mag": mag, "Z_phase_deg": phase}
+    return {"Xl": Xl, "Xc": Xc, "Z_mag": abs(Z), "Z_phase_deg": math.degrees(cmath.phase(Z))}
 
 class ResistorCodeRequest(BaseModel):
     ohms: float
@@ -257,59 +225,30 @@ class ResistorCodeRequest(BaseModel):
 @app.post("/api/resistor-color")
 def resistor_color(req: ResistorCodeRequest):
     value = req.ohms
-    if value <= 0:
-        return {"error": "양의 저항값(Ω)을 입력하세요."}
-    bands = [
-        ("black", 0), ("brown", 1), ("red", 2), ("orange", 3), ("yellow", 4),
-        ("green", 5), ("blue", 6), ("violet", 7), ("gray", 8), ("white", 9)
-    ]
+    if value <= 0: return {"error": "양의 저항값(Ω)을 입력하세요."}
+    bands = [("black", 0), ("brown", 1), ("red", 2), ("orange", 3), ("yellow", 4), ("green", 5), ("blue", 6), ("violet", 7), ("gray", 8), ("white", 9)]
     def color_for_digit(d): return bands[d][0]
-    exponent = 0
-    v = value
-    while v >= 100:
-        v /= 10; exponent += 1
-    while v < 10:
-        v *= 10; exponent -= 1
+    exponent = 0; v = value
+    while v >= 100: v /= 10; exponent += 1
+    while v < 10: v *= 10; exponent -= 1
     digits = int(round(v))
-    if digits >= 100:
-        digits //= 10; exponent += 1
+    if digits >= 100: digits //= 10; exponent += 1
     d1, d2 = digits // 10, digits % 10
     multiplier_color = bands[exponent][0] if 0 <= exponent < len(bands) else "gold"
     return {"bands": [color_for_digit(d1), color_for_digit(d2), multiplier_color, "gold"]}
 
 @app.get("/api/circuit-problem")
 def circuit_problem():
-    V = int(os.getenv("CIRCUIT_V_MIN", "5"))
-    Vmax = int(os.getenv("CIRCUIT_V_MAX", "24"))
-    Rmin = int(os.getenv("CIRCUIT_R_MIN", "10"))
-    Rmax = int(os.getenv("CIRCUIT_R_MAX", "500"))
-    V0 = random.randint(V, Vmax)
-    R1 = random.randint(Rmin, Rmax)
-    R2 = random.randint(Rmin, Rmax)
-    Rt = R1 + R2
-    I = V0 / Rt
-    V1 = I * R1
-    V2 = I * R2
-    fig_w, fig_h = (5, 3)
-    plt.figure(figsize=(fig_w, fig_h))
+    V0 = random.randint(int(os.getenv("CIRCUIT_V_MIN", "5")), int(os.getenv("CIRCUIT_V_MAX", "24")))
+    R1 = random.randint(int(os.getenv("CIRCUIT_R_MIN", "10")), int(os.getenv("CIRCUIT_R_MAX", "500")))
+    R2 = random.randint(int(os.getenv("CIRCUIT_R_MIN", "10")), int(os.getenv("CIRCUIT_R_MAX", "500")))
+    Rt, I, V1, V2 = R1 + R2, V0 / (R1 + R2), (V0 * R1) / (R1 + R2), (V0 * R2) / (R1 + R2)
     with schemdraw.Drawing(show=False) as d:
         d.config(fontsize=12)
         d += elm.SourceV().up().label(f"{V0} V", loc="right")
-        d += elm.Line().right()
-        d += elm.Resistor().down().label(f"R1 = {R1} Ω")
-        d += elm.Line().left()
-        d += elm.Resistor().up().label(f"R2 = {R2} Ω")
-        d += elm.Line().right()
-    img = io.BytesIO()
-    d.save(img, fmt="png")
-    img.seek(0)
+        d += elm.Line().right(); d += elm.Resistor().down().label(f"R1 = {R1} Ω"); d += elm.Line().left()
+        d += elm.Resistor().up().label(f"R2 = {R2} Ω"); d += elm.Line().right()
+    img = io.BytesIO(); d.save(img, fmt="png"); img.seek(0)
     b64 = base64.b64encode(img.getvalue()).decode("utf-8")
-    question_pool = [
-        "회로의 총 저항 Rt는 얼마입니까?",
-        "회로의 총 전류 I는 얼마입니까?",
-        "저항 R1의 전압강하 V1은 얼마입니까?",
-        "저항 R2의 전압강하 V2는 얼마입니까?",
-    ]
-    q = random.choice(question_pool)
-    solution = {"Rt": Rt, "I": I, "V1": V1, "V2": V2}
-    return {"image_base64": b64, "V": V0, "R1": R1, "R2": R2, "question": q, "solution": solution}
+    q = random.choice(["...총 저항 Rt는?", "...총 전류 I는?", "...저항 R1의 전압강하 V1은?", "...저항 R2의 전압강하 V2는?"])
+    return {"image_base64": b64, "V": V0, "R1": R1, "R2": R2, "question": f"회로의 {q}", "solution": {"Rt": Rt, "I": I, "V1": V1, "V2": V2}}
