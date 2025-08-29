@@ -1,25 +1,37 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { documentQA } from '../api'
-import './DocumentQA.css'; // 새로 생성할 CSS 파일 임포트
+import ReactMarkdown from 'react-markdown' // [개선 1] 마크다운 렌더링을 위해 임포트
+import './DocumentQA.css';
 
-type Msg = { role: 'user' | 'assistant', content: string, sources?: {page:number|null, source:string}[] }
+type Msg = { 
+  role: 'user' | 'assistant', 
+  content: string, 
+  sources?: { page: number | null, source: string }[] 
+}
 
 export default function DocumentQA() {
-  // --- State Hooks ---
   const [file, setFile] = useState<File | null>(null)
   const [messages, setMessages] = useState<Msg[]>([])
   const [question, setQuestion] = useState('')
   const [status, setStatus] = useState('PDF 파일을 업로드하고 질문을 시작하세요.')
   const [isLoading, setIsLoading] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
+  
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const chatWindowRef = useRef<HTMLDivElement>(null) // [개선 2] 자동 스크롤을 위한 ref 추가
 
-  // --- Handlers ---
+  // [개선 2] 새 메시지가 추가되면 채팅창을 맨 아래로 스크롤
+  useEffect(() => {
+    if (chatWindowRef.current) {
+      chatWindowRef.current.scrollTop = chatWindowRef.current.scrollHeight;
+    }
+  }, [messages]);
+
   const handleFileChange = (selectedFile: File | null) => {
     if (selectedFile && selectedFile.type === 'application/pdf') {
       setFile(selectedFile)
       setStatus(`'${selectedFile.name}' 문서가 준비되었습니다.`)
-      setMessages([]) // 새 파일이므로 메시지 초기화
+      setMessages([])
     } else {
       alert('PDF 파일만 업로드할 수 있습니다.');
     }
@@ -29,13 +41,14 @@ export default function DocumentQA() {
     if (!file || !question.trim() || isLoading) return
 
     const userMessage: Msg = { role: 'user', content: question }
+    
+    // [개선 3] 사용자 메시지와 AI 응답을 한 번의 상태 업데이트로 처리하여 렌더링을 최적화
     setMessages(prev => [...prev, userMessage])
     setQuestion('')
     setIsLoading(true)
     setStatus('답변을 생성하는 중입니다...')
 
     try {
-      // API는 파일과 현재 질문만 받음 (백엔드가 대화기록을 관리하지 않음)
       const res = await documentQA(file, question)
       const assistantMessage: Msg = { role: 'assistant', content: res.answer, sources: res.sources || [] }
       setMessages(prev => [...prev, assistantMessage])
@@ -44,35 +57,31 @@ export default function DocumentQA() {
       setMessages(prev => [...prev, errorMessage])
     } finally {
       setIsLoading(false)
-      setStatus(`'${file.name}' 문서에 대해 추가 질문을 할 수 있습니다.`)
+      // [개선 4] 옵셔널 체이닝(?.)을 사용하여 file이 null일 경우의 런타임 에러 방지
+      setStatus(`'${file?.name}' 문서에 대해 추가 질문을 할 수 있습니다.`)
     }
   }
 
-  // --- Drag and Drop Logic ---
+  // --- Drag and Drop Logic (기존과 동일) ---
   const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(true)
+    e.preventDefault(); e.stopPropagation(); setIsDragging(true);
   }
   const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(false)
+    e.preventDefault(); e.stopPropagation(); setIsDragging(false);
   }
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
+    e.preventDefault(); e.stopPropagation();
   }
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(false)
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleFileChange(e.dataTransfer.files[0])
+      handleFileChange(e.dataTransfer.files[0]);
     }
   }
 
-  // --- Render ---
+  // --- 렌더링 로직 ---
   if (!file) {
     return (
       <div 
@@ -100,7 +109,6 @@ export default function DocumentQA() {
 
   return (
     <div className="qa-container">
-      {/* Left Column */}
       <div className="file-info-panel">
         <h4>📄 업로드된 문서</h4>
         <div className="file-card">
@@ -112,40 +120,40 @@ export default function DocumentQA() {
         <button className="reset-btn" onClick={() => setFile(null)}>다른 파일 업로드</button>
       </div>
 
-      {/* Right Column */}
       <div className="doc-chat-panel">
         <h4>문서 Q&A</h4>
-        <div className="doc-chat-window">
-            {messages.length === 0 && <div className="chat-placeholder">문서 내용에 대한 질문을 입력하세요.</div>}
-            {messages.map((msg, index) => (
-                <div key={index} className={`doc-message ${msg.role}`}>
-                    <div className="doc-message-content">
-                        <p>{msg.content}</p>
-                        {msg.role === 'assistant' && msg.sources && msg.sources.length > 0 && (
-                            <div className="sources">
-                                <strong>출처:</strong>
-                                <ul>
-                                    {msg.sources.map((s, i) => (
-                                        <li key={i}>페이지 {s.page ?? '?'}</li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            ))}
-             {isLoading && <div className="doc-message assistant"><div className="doc-message-content"><i>생각 중...</i></div></div>}
+        <div className="doc-chat-window" ref={chatWindowRef}>
+          {messages.length === 0 && <div className="chat-placeholder">문서 내용에 대한 질문을 입력하세요.</div>}
+          {messages.map((msg, index) => (
+            <div key={index} className={`doc-message ${msg.role}`}>
+              <div className="doc-message-content">
+                {/* [개선 1] 마크다운 렌더링 적용 */}
+                <ReactMarkdown>{msg.content}</ReactMarkdown>
+                {msg.role === 'assistant' && msg.sources && msg.sources.length > 0 && (
+                  <div className="sources">
+                    <strong>출처:</strong>
+                    <ul>
+                      {msg.sources.map((s, i) => (
+                        <li key={i}>페이지 {s.page ?? '?'}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+          {isLoading && <div className="doc-message assistant"><div className="doc-message-content"><p><i>생각 중...</i></p></div></div>}
         </div>
         <div className="doc-chat-input">
-            <input 
-                type="text"
-                placeholder="문서 내용에 대해 질문하세요..."
-                value={question}
-                onChange={e => setQuestion(e.target.value)}
-                onKeyPress={e => e.key === 'Enter' && handleAskQuestion()}
-                disabled={isLoading}
-            />
-            <button onClick={handleAskQuestion} disabled={isLoading}>질문하기</button>
+          <input 
+            type="text"
+            placeholder="문서 내용에 대해 질문하세요..."
+            value={question}
+            onChange={e => setQuestion(e.target.value)}
+            onKeyPress={e => e.key === 'Enter' && handleAskQuestion()}
+            disabled={isLoading}
+          />
+          <button onClick={handleAskQuestion} disabled={isLoading}>질문하기</button>
         </div>
       </div>
     </div>
