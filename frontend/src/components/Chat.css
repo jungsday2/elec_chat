@@ -138,12 +138,17 @@
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
+  
+  /* --- ▼▼▼ 아래 2줄 추가 및 height 속성 제거 ▼▼▼ --- */
+  white-space: nowrap; /* 텍스트가 줄바꿈되지 않도록 강제 */
+  flex-shrink: 0;      /* 버튼이 부모 요소에 의해 찌그러지지 않도록 설정 */
 }
 
 .send-btn:disabled {
     background-color: #9ca3af;
     cursor: not-allowed;
 }
+
 
 .input-footer {
     display: flex;
