@@ -4,14 +4,20 @@ import './Chat.css';
 
 type Msg = { role: 'user' | 'assistant', content: string }
 
+const INITIAL_SUGGESTIONS = [
+    'ESS 산업 현황에 대해 알려줘',
+    'BESS 시장 트렌드 핵심 포인트',
+    'EV 충전 인프라 최근 이슈 정리'
+];
+
 export default function Chat() {
   const [messages, setMessages] = useState<Msg[]>([]);
-  const [input, setInput] = useState('')
+  const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>(INITIAL_SUGGESTIONS);
   const chatWindowRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // 1. 컴포넌트가 처음 로드될 때 저장된 대화 기록을 불러옵니다.
   useEffect(() => {
     const savedChat = localStorage.getItem('chatHistory');
     if (savedChat) {
@@ -23,22 +29,18 @@ export default function Chat() {
     }
   }, []);
 
-  // 2. 메시지 목록이 변경될 때마다 자동으로 로컬 스토리지에 저장합니다.
   useEffect(() => {
-    // 초기 메시지는 저장하지 않도록 비어있지 않을 때만 저장
     if (messages.length > 0) {
       localStorage.setItem('chatHistory', JSON.stringify(messages));
     }
   }, [messages]);
 
-  // 메시지 목록이 업데이트될 때마다 맨 아래로 스크롤합니다.
   useEffect(() => {
     if (chatWindowRef.current) {
       chatWindowRef.current.scrollTop = chatWindowRef.current.scrollHeight;
     }
   }, [messages]);
-
-  // 입력창 높이를 자동으로 조절합니다.
+  
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -46,9 +48,10 @@ export default function Chat() {
     }
   }, [input]);
 
-  async function send() {
-    if (!input.trim() || isLoading) return;
-    const next: Msg[] = [...messages, { role: 'user' as const, content: input }];
+  async function send(messageContent: string) {
+    if (!messageContent.trim() || isLoading) return;
+    
+    const next: Msg[] = [...messages, { role: 'user' as const, content: messageContent }];
     setMessages(next);
     setInput('');
     setIsLoading(true);
@@ -57,6 +60,10 @@ export default function Chat() {
     try {
       const res = await chat(payload as any);
       setMessages([...next, { role: 'assistant' as const, content: res.output }]);
+      // 추천 질문이 있을 경우에만 업데이트
+      if(res.suggestions && res.suggestions.length > 0) {
+        setSuggestions(res.suggestions);
+      }
     } catch (e: any) {
       setMessages([...next, { role: 'assistant' as const, content: '서버 오류가 발생했습니다. OPENAI_API_KEY가 설정되었는지 확인하세요.' }]);
     } finally {
@@ -64,8 +71,13 @@ export default function Chat() {
     }
   }
 
-  const handleExampleClick = (query: string) => {
-    setInput(query);
+  const handleSendClick = () => {
+    send(input);
+  }
+
+  const handleSuggestionClick = (suggestion: string) => {
+    // 추천 질문을 바로 전송
+    send(suggestion);
   };
 
   const handleCopyToClipboard = (text: string) => {
@@ -78,6 +90,7 @@ export default function Chat() {
       { role: 'assistant', content: '안녕하세요! 어떻게 도와드릴까요? 전기·공학에 관한 질문이나 다른 주제에 대해 이야기하고 싶으신가요?' }
     ]);
     setInput('');
+    setSuggestions(INITIAL_SUGGESTIONS);
   };
 
   return (
@@ -113,21 +126,21 @@ export default function Chat() {
             onKeyPress={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                send();
+                handleSendClick();
               }
             }}
             placeholder="전기공학 질문을 입력하세요..."
             disabled={isLoading}
             rows={1}
           />
-          <button className="send-btn" onClick={send} disabled={isLoading}>전송</button>
+          <button className="send-btn" onClick={handleSendClick} disabled={isLoading}>전송</button>
         </div>
         <div className="input-footer">
             <div className="example-queries">
-              <span>예시 질문</span>
-              <button onClick={() => handleExampleClick('ESS 산업 현황에 대해 알려줘')}>ESS 산업 현황</button>
-              <button onClick={() => handleExampleClick('BESS 시장 트렌드 핵심 포인트')}>BESS 트렌드</button>
-              <button onClick={() => handleExampleClick('EV 충전 인프라 최근 이슈 정리')}>EV 충전 이슈</button>
+              <span>추천 질문</span>
+              {suggestions.map((q, i) => (
+                <button key={i} onClick={() => handleSuggestionClick(q)}>{q}</button>
+              ))}
             </div>
             <button className="new-chat-btn" onClick={startNewChat}>새로운 대화 시작</button>
         </div>
