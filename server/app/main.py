@@ -26,6 +26,7 @@ from langchain_core.documents import Document
 import math
 import cmath
 import sympy as sp
+from sympy.vector import CoordSys3D, curl, divergence, gradient
 
 # --- FastAPI 앱 초기화 및 CORS 설정 ---
 app = FastAPI(title="JeongirIt Backend", version="1.0.0")
@@ -239,3 +240,61 @@ def resistor_color(req: ResistorCodeRequest):
             "gold" # 4-band 오차는 금색으로 고정
         ]
     }
+class VectorCalculusRequest(BaseModel):
+    operation: Literal["grad", "div", "curl"]
+    expression: str
+    variables: str = "x y z"
+
+@app.post("/api/vector-calculus")
+def vector_calculus(req: VectorCalculusRequest):
+    try:
+        vars_list = sp.symbols(req.variables)
+        N = CoordSys3D('N')
+        
+        if req.operation == "grad":
+            scalar_field = sp.sympify(req.expression)
+            result = gradient(scalar_field)
+        else: # div, curl
+            # 벡터 필드를 파싱 (쉼표 또는 줄바꿈으로 구분)
+            exprs = [s.strip() for s in req.expression.replace('\n', ',').split(',') if s.strip()]
+            if len(exprs) != len(vars_list):
+                return {"error": f"벡터 차원({len(exprs)})과 변수 개수({len(vars_list)})가 일치하지 않습니다."}
+            
+            vector_field = sp.sympify(exprs[0]) * N.i + sp.sympify(exprs[1]) * N.j + sp.sympify(exprs[2]) * N.k
+            
+            if req.operation == "div":
+                result = divergence(vector_field)
+            else: # curl
+                result = curl(vector_field)
+        
+        return {"result": str(result)}
+    except Exception as e:
+        return {"error": f"계산 중 오류 발생: {str(e)}"}
+
+# ▼▼▼ [추가] 일반 미분/정적분 계산기 ▼▼▼
+class CalculusRequest(BaseModel):
+    operation: Literal["diff", "int"]
+    expression: str
+    variable: str
+    lower_bound: Optional[str] = None
+    upper_bound: Optional[str] = None
+
+@app.post("/api/calculus")
+def calculus(req: CalculusRequest):
+    try:
+        x = sp.symbols(req.variable)
+        expr = sp.sympify(req.expression)
+
+        if req.operation == "diff":
+            result = sp.diff(expr, x)
+        else: # int
+            if req.lower_bound and req.upper_bound: # 정적분
+                a = sp.sympify(req.lower_bound)
+                b = sp.sympify(req.upper_bound)
+                result = sp.integrate(expr, (x, a, b))
+            else: # 부정적분
+                result = sp.integrate(expr, x)
+        
+        return {"result": str(result)}
+    except Exception as e:
+        return {"error": f"계산 중 오류 발생: {str(e)}"}
