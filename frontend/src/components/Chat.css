@@ -138,7 +138,6 @@
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  height: 52px;
 }
 
 .send-btn:disabled {
