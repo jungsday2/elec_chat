@@ -42,4 +42,23 @@ export async function rlc(payload: {R:number;L:number;C:number;f:number}) {
   return res.data as {Xl:number;Xc:number;Z_mag:number;Z_phase_deg:number}
 }
 
-// --- [제거] circuitProblem 함수 전체 제거 ---
+export async function vectorCalculus(payload: {
+  operation: 'grad' | 'div' | 'curl';
+  expression: string;
+  variables: string;
+}) {
+  const res = await axios.post(`${API_BASE}/api/vector-calculus`, payload);
+  return res.data as { result: string } | { error: string };
+}
+
+// ▼▼▼ [추가] 일반 미분/정적분 API 호출 함수 ▼▼▼
+export async function calculus(payload: {
+  operation: 'diff' | 'int';
+  expression: string;
+  variable: string;
+  lower_bound?: string;
+  upper_bound?: string;
+}) {
+  const res = await axios.post(`${API_BASE}/api/calculus`, payload);
+  return res.data as { result: string } | { error: string };
+}
