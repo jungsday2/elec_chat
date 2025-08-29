@@ -3,6 +3,7 @@
 import os
 import io
 import base64
+import json # JSON 파싱을 위해 추가
 from typing import List, Optional, Literal
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,23 +30,19 @@ matplotlib.use("Agg")  # headless
 import matplotlib.pyplot as plt
 import schemdraw
 import schemdraw.elements as elm
-# app/main.py (상단 import 확인)
+
 app = FastAPI(title="JeongirIt Backend", version="1.0.0")
 
-FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "")  # 반드시 전체 URL, 예: https://jeongirit-frontend.onrender.com
-ALLOWED_ORIGINS = [FRONTEND_ORIGIN] if FRONTEND_ORIGIN else ["*"]  # 비었으면 임시로 전체 허용
+FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "")
+ALLOWED_ORIGINS = [FRONTEND_ORIGIN] if FRONTEND_ORIGIN else ["*"]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,      # ['https://jeongirit-frontend.onrender.com']
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# 디버그용 (배포 로그에서 값 확인)
-print("[CORS] FRONTEND_ORIGIN =", FRONTEND_ORIGIN)
-print("[CORS] ALLOWED_ORIGINS =", ALLOWED_ORIGINS)
 
 load_dotenv()
 
@@ -53,7 +50,6 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 if not OPENAI_API_KEY:
-    # Don't crash, but warn clearly in logs.
     print("[WARN] OPENAI_API_KEY is not set. LLM features will fail until it's configured.")
 
 # ---------- Models ----------
@@ -66,8 +62,10 @@ class ChatRequest(BaseModel):
     temperature: float = 0.3
     system_style: Optional[str] = None
 
+# ▼▼▼ [수정] ChatResponse 모델에 suggestions 필드 추가 ▼▼▼
 class ChatResponse(BaseModel):
     output: str
+    suggestions: List[str]
 
 # ---------- Utilities ----------
 STYLE_SYS = (
@@ -88,19 +86,40 @@ def _ensure_system_style(messages: List[ChatMessage], override: Optional[str] = 
 def health():
     return {"status": "ok"}
 
+# ▼▼▼ [수정] /api/chat 엔드포인트 로직 수정 ▼▼▼
 @app.post("/api/chat", response_model=ChatResponse)
 def chat(req: ChatRequest):
-    # Prepare messages for LangChain's ChatOpenAI
     lc_messages = []
     for m in _ensure_system_style(req.messages, req.system_style):
         lc_messages.append({"role": m.role, "content": m.content})
-
+    
+    trimmed_history = lc_messages[-20:]
     llm = ChatOpenAI(model=DEFAULT_MODEL, temperature=req.temperature)
-    # Send only last ~20 messages to keep token size bounded
-    trimmed = lc_messages[-20:]
-    resp = llm.invoke(trimmed)
-    text = resp.content if hasattr(resp, "content") else str(resp)
-    return ChatResponse(output=text)
+    
+    # 1. 메인 답변 생성
+    resp = llm.invoke(trimmed_history)
+    main_answer = resp.content if hasattr(resp, "content") else str(resp)
+
+    # 2. 후속 질문 추천 생성
+    suggestions = []
+    try:
+        suggestion_prompt = ChatPromptTemplate.from_messages([
+            ("system", "지금까지의 대화 내용을 바탕으로, 사용자가 궁금해할 만한 다음 질문 3개를 추천해주세요. "
+                       "질문은 매우 짧고 간결해야 합니다. "
+                       "반드시 JSON 형식의 문자열 배열로만 응답해야 합니다. 예: [\"질문 1\", \"질문 2\", \"질문 3\"]"),
+            # HumanMessage 대신 전체 대화 기록을 전달
+            ("human", f"대화 기록: {json.dumps(trimmed_history, ensure_ascii=False)}")
+        ])
+        suggestion_chain = suggestion_prompt | ChatOpenAI(model=DEFAULT_MODEL, temperature=0.5)
+        suggestion_resp = suggestion_chain.invoke({})
+        # 응답 content가 JSON 문자열이므로 파싱
+        suggestions = json.loads(suggestion_resp.content)
+    except Exception as e:
+        print(f"[WARN] Failed to generate suggestions: {e}")
+        # 실패 시 빈 리스트 반환
+        suggestions = []
+
+    return ChatResponse(output=main_answer, suggestions=suggestions)
 
 # ---------- Document QA (RAG) ----------
 def _build_retriever_from_pdf_bytes(pdf_bytes: bytes):
@@ -161,10 +180,7 @@ class OhmsLawRequest(BaseModel):
 @app.post("/api/ohms-law")
 def ohms_law(req: OhmsLawRequest):
     V, I, R, P = req.V, req.I, req.R, req.P
-    # Compute missing values when possible using V=IR and P=VI
-    # Prefer R=V/I when V & I given, etc.
     try:
-        # Solve using sympy for robustness
         v, i, r, p = sp.symbols("v i r p", real=True)
         equations = []
         if V is not None: equations.append(sp.Eq(v, V))
@@ -181,7 +197,6 @@ def ohms_law(req: OhmsLawRequest):
         Vc, Ic, Rc, Pc = [float(s) for s in sol]
         return {"V": Vc, "I": Ic, "R": Rc, "P": Pc}
     except Exception:
-        # Fallback: try direct algebra with available pairs
         if V is not None and I is not None:
             R = V / I
             P = V * I
@@ -222,9 +237,9 @@ def parallel_resistance(req: Resistances):
 
 class RLCRequest(BaseModel):
     R: float
-    L: float  # Henry
-    C: float  # Farad
-    f: float  # Hz
+    L: float
+    C: float
+    f: float
 
 @app.post("/api/rlc")
 def rlc(req: RLCRequest):
@@ -244,13 +259,11 @@ def resistor_color(req: ResistorCodeRequest):
     value = req.ohms
     if value <= 0:
         return {"error": "양의 저항값(Ω)을 입력하세요."}
-    # 4-band: First two digits + multiplier + tolerance (default gold 5%)
     bands = [
         ("black", 0), ("brown", 1), ("red", 2), ("orange", 3), ("yellow", 4),
         ("green", 5), ("blue", 6), ("violet", 7), ("gray", 8), ("white", 9)
     ]
     def color_for_digit(d): return bands[d][0]
-
     exponent = 0
     v = value
     while v >= 100:
@@ -261,10 +274,9 @@ def resistor_color(req: ResistorCodeRequest):
     if digits >= 100:
         digits //= 10; exponent += 1
     d1, d2 = digits // 10, digits % 10
-    multiplier_color = bands[exponent][0] if 0 <= exponent < len(bands) else "gold"  # fallback
+    multiplier_color = bands[exponent][0] if 0 <= exponent < len(bands) else "gold"
     return {"bands": [color_for_digit(d1), color_for_digit(d2), multiplier_color, "gold"]}
 
-# ---------- Circuit Problem Generator ----------
 @app.get("/api/circuit-problem")
 def circuit_problem():
     V = int(os.getenv("CIRCUIT_V_MIN", "5"))
@@ -278,8 +290,6 @@ def circuit_problem():
     I = V0 / Rt
     V1 = I * R1
     V2 = I * R2
-
-    # Draw with schemdraw
     fig_w, fig_h = (5, 3)
     plt.figure(figsize=(fig_w, fig_h))
     with schemdraw.Drawing(show=False) as d:
@@ -290,12 +300,10 @@ def circuit_problem():
         d += elm.Line().left()
         d += elm.Resistor().up().label(f"R2 = {R2} Ω")
         d += elm.Line().right()
-    # Export image
     img = io.BytesIO()
     d.save(img, fmt="png")
     img.seek(0)
     b64 = base64.b64encode(img.getvalue()).decode("utf-8")
-
     question_pool = [
         "회로의 총 저항 Rt는 얼마입니까?",
         "회로의 총 전류 I는 얼마입니까?",
@@ -303,10 +311,5 @@ def circuit_problem():
         "저항 R2의 전압강하 V2는 얼마입니까?",
     ]
     q = random.choice(question_pool)
-    solution = {
-        "Rt": Rt,
-        "I": I,
-        "V1": V1,
-        "V2": V2
-    }
+    solution = {"Rt": Rt, "I": I, "V1": V1, "V2": V2}
     return {"image_base64": b64, "V": V0, "R1": R1, "R2": R2, "question": q, "solution": solution}
