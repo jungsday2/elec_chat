@@ -20,6 +20,7 @@ from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains.summarize import load_summarize_chain
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
 
 # Calculations
@@ -44,7 +45,6 @@ app.add_middleware(
 
 # --- 환경변수 로드 및 모델 설정 ---
 load_dotenv()
-
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
@@ -71,20 +71,34 @@ def health():
 
 @app.post("/api/chat", response_model=ChatResponse)
 def chat(req: ChatRequest):
+    user_question = req.messages[-1].content
+
+    # --- 1. 질문 주제 판별 (Guardrail) ---
+    guard_llm = ChatOpenAI(model=DEFAULT_MODEL, temperature=0)
+    guard_prompt = ChatPromptTemplate.from_template(
+        "다음 질문이 전기, 전자, 에너지, 전력, 반도체, 통신, 신호처리 등 공학 분야와 관련이 있으면 'Yes', 관련이 없다면 'No' 라고만 답해주세요.\n\n질문: {question}"
+    )
+    guard_chain = guard_prompt | guard_llm | StrOutputParser()
+    topic_check_result = guard_chain.invoke({"question": user_question})
+
+    # --- 2. 판별 결과에 따른 분기 처리 ---
+    if "no" in topic_check_result.lower():
+        # 관련 없는 질문일 경우, 미리 정해진 답변과 빈 추천 질문 목록을 반환
+        return ChatResponse(output="전기/전자 관련 질문을 부탁드립니다.", suggestions=[])
+
+    # --- 3. 관련 있는 질문일 경우, 기존 답변 생성 로직 실행 ---
     lc_messages = [{"role": m.role, "content": m.content} for m in req.messages]
     
-    # 추천 질문은 최근 대화 4개를 기반으로 생성
     trimmed_history_for_suggestions = lc_messages[-4:]
-    # 메인 답변은 최대 20개의 대화 기록을 참고
     trimmed_history_for_answer = lc_messages[-20:]
     
     llm = ChatOpenAI(model=DEFAULT_MODEL, temperature=req.temperature)
     
-    # 1. 메인 답변 생성
+    # 메인 답변 생성
     resp = llm.invoke(trimmed_history_for_answer)
     main_answer = resp.content if hasattr(resp, "content") else str(resp)
 
-    # 2. 후속 추천 질문 생성
+    # 후속 추천 질문 생성
     suggestions = []
     try:
         suggestion_prompt_template = (
@@ -105,11 +119,12 @@ def chat(req: ChatRequest):
 
     return ChatResponse(output=main_answer, suggestions=suggestions)
 
+
 @app.post("/api/document-qa")
 async def document_qa(file: UploadFile = File(...), question: str = Form(...)):
     pdf_bytes = await file.read()
     
-    tmp_path = f"/tmp/{file.filename}"
+    tmp_path = f"/tmp/{random.randint(1, 1000)}_{file.filename}"
     with open(tmp_path, "wb") as f:
         f.write(pdf_bytes)
     
@@ -123,21 +138,10 @@ async def document_qa(file: UploadFile = File(...), question: str = Form(...)):
     sources = []
 
     if is_summary_request:
-        # [개선] '분할 정복(MapReduce)' 요약 방식으로 변경
-        map_prompt = ChatPromptTemplate.from_template(
-            '다음은 문서의 일부 내용입니다. 이 내용의 핵심을 간결하게 요약해주세요:\n\n"{text}"\n\n요약:'
-        )
-        combine_prompt = ChatPromptTemplate.from_template(
-            "다음은 여러 문서 조각들의 요약본입니다. 이 요약본들을 종합하여 전체 문서의 내용을 구조적으로 정리해주세요. 서론, 본론, 결론이 명확히 드러나도록 작성하고, 한국어로 답변해주세요.\n\n[요약본들]\n{text}\n\n[최종 정리]"
-        )
-        summary_chain = load_summarize_chain(
-            llm=llm, chain_type="map_reduce",
-            map_prompt=map_prompt, combine_prompt=combine_prompt
-        )
+        summary_chain = load_summarize_chain(llm=llm, chain_type="map_reduce")
         result = summary_chain.invoke(docs)
         answer = result.get("output_text", "요약 생성에 실패했습니다.")
     else:
-        # 기존 RAG 방식
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1200, chunk_overlap=200)
         chunks = text_splitter.split_documents(docs)
         vector_store = FAISS.from_documents(chunks, OpenAIEmbeddings())
