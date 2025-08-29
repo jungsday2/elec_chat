@@ -1,0 +1,193 @@
+/* frontend/src/components/DocumentQA.css */
+
+/* --- 1. 드래그 앤 드롭 업로드 UI --- */
+.drop-zone {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+  padding: 48px;
+  text-align: center;
+  color: #6b7280;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.drop-zone:hover, .drop-zone.dragging {
+  background-color: #f3f4f6;
+  border-color: #3b82f6;
+}
+
+.drop-zone h2 {
+  margin: 16px 0 8px;
+  font-size: 1.25rem;
+  color: #111827;
+}
+
+.drop-zone p {
+  margin: 0;
+}
+
+.upload-icon {
+  font-size: 3rem;
+  color: #9ca3af;
+}
+
+.upload-link {
+    font-weight: 600;
+    color: #3b82f6;
+}
+
+
+/* --- 2. 업로드 후 2단 레이아웃 UI --- */
+.qa-container {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 24px;
+  height: 100%;
+}
+
+/* --- Left Column: File Info --- */
+.file-info-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background-color: #f9fafb;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+.file-info-panel h4 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.file-card {
+  padding: 12px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.file-name {
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.file-size {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.status-message {
+  font-size: 0.9rem;
+  margin: 0;
+  padding: 10px;
+  background-color: #eff6ff;
+  border-radius: 8px;
+}
+
+.reset-btn {
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    background-color: #fff;
+    cursor: pointer;
+    margin-top: auto; /* 맨 아래로 버튼을 밀어냄 */
+}
+
+/* --- Right Column: Document Chat --- */
+.doc-chat-panel {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.doc-chat-panel h4 {
+    margin: 0;
+    padding: 16px;
+    border-bottom: 1px solid #e5e7eb;
+    background-color: #f9fafb;
+}
+
+.doc-chat-window {
+  flex-grow: 1;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.chat-placeholder {
+    margin: auto;
+    color: #9ca3af;
+}
+
+.doc-message {
+  max-width: 85%;
+  display: flex;
+}
+.doc-message.user {
+  align-self: flex-end;
+}
+.doc-message.assistant {
+  align-self: flex-start;
+}
+
+.doc-message-content {
+  padding: 12px 16px;
+  border-radius: 12px;
+  line-height: 1.5;
+}
+.doc-message.user .doc-message-content {
+  background-color: #eff6ff;
+  color: #1e40af;
+}
+.doc-message.assistant .doc-message-content {
+  background-color: #f3f4f6;
+  color: #1f2937;
+}
+
+.sources {
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px solid #d1d5db;
+    font-size: 0.8rem;
+}
+.sources ul {
+    margin: 4px 0 0;
+    padding-left: 16px;
+    display: flex;
+    gap: 8px;
+}
+.sources li {
+    list-style-type: disc;
+}
+
+
+.doc-chat-input {
+  display: flex;
+  gap: 8px;
+  padding: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+.doc-chat-input input {
+    flex-grow: 1;
+}
+.doc-chat-input button {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    background-color: #3b82f6;
+    color: white;
+    cursor: pointer;
+}
+.doc-chat-input button:disabled {
+    background-color: #9ca3af;
+}
