@@ -103,28 +103,55 @@
 }
 
 /* --- 하단 입력창 --- */
-.chat-input-area {
+.chat-input-section {
   padding: 16px;
   border-top: 1px solid #e5e7eb;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
 }
 
-.chat-input-area textarea {
-  width: 100%;
+.input-wrapper {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.input-wrapper textarea {
+  flex-grow: 1;
   padding: 14px 18px;
   border-radius: 12px;
   border: 1px solid #d1d5db;
   font-size: 1rem;
   box-sizing: border-box;
-  resize: none; /* 사용자가 크기 조절 못하게 막기 */
-  overflow-y: hidden; /* 스크롤바 숨기기 */
-  min-height: 52px; /* 초기 높이 */
-  max-height: 200px; /* 최대 높이 */
+  resize: none;
+  overflow-y: hidden;
+  min-height: 52px;
+  max-height: 200px;
   line-height: 1.5;
   font-family: inherit;
+}
+
+.send-btn {
+  padding: 14px 24px;
+  border: none;
+  border-radius: 12px;
+  background-color: #3b82f6;
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  height: 52px;
+}
+
+.send-btn:disabled {
+    background-color: #9ca3af;
+    cursor: not-allowed;
+}
+
+.input-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    gap: 16px;
 }
 
 .example-queries {
@@ -138,6 +165,7 @@
   font-size: 0.8rem;
   font-weight: 500;
   color: #6b7280;
+  white-space: nowrap;
 }
 
 .example-queries button {
@@ -147,19 +175,15 @@
   border-radius: 20px;
   font-size: 0.8rem;
   cursor: pointer;
+  white-space: nowrap;
 }
 
-.chat-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 12px;
-}
-
-.action-btn {
+.new-chat-btn {
   padding: 8px 16px;
   border: 1px solid #d1d5db;
-  background-color: #ffffff;
+  background-color: #f9fafb;
   border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
 }
